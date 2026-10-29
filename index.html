@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Cut a part of a GEDCOM family tree into its own GEDCOM file. Runs entirely in your browser."
+    />
+    <title>GedcomSlice</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6f5e'/%3E%3Cpath d='M16 6v8m0 0-7 6m7-6 7 6M9 20v6m14-6v6' stroke='white' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"></span>
+        <div>
+          <h1>GedcomSlice</h1>
+          <p class="tagline">Cut a branch out of your family tree</p>
+        </div>
+      </div>
+      <div class="file-actions">
+        <span id="file-name" class="file-name"></span>
+        <label class="button primary">
+          Open GEDCOM…
+          <input id="file-input" type="file" accept=".ged,.gedcom,text/plain" hidden />
+        </label>
+        <button id="sample-button" class="button" type="button">Try a sample</button>
+      </div>
+    </header>
+
+    <section id="welcome" class="welcome">
+      <div class="dropzone" id="dropzone">
+        <h2>Drop a .ged file here</h2>
+        <p>
+          or use <strong>Open GEDCOM…</strong> above. Pick people in the list or draw a rectangle on the tree, then
+          download a new GEDCOM with only them.
+        </p>
+        <p class="privacy">Your file never leaves your computer: everything runs in this browser tab.</p>
+      </div>
+    </section>
+
+    <main id="workspace" class="workspace" hidden>
+      <aside class="list-panel">
+        <div class="panel-head">
+          <input id="search" type="search" placeholder="Search name or ID…" autocomplete="off" />
+          <div class="bulk">
+            <button type="button" class="button small" data-bulk="visible">Select shown</button>
+            <button type="button" class="button small" data-bulk="none">Clear</button>
+            <button type="button" class="button small" data-bulk="invert">Invert</button>
+          </div>
+        </div>
+        <div class="helpers">
+          <div class="active-line">Person: <strong id="active-name">click a name</strong></div>
+          <div class="helper-buttons">
+            <button type="button" class="button small" data-helper="ancestors" disabled>+ Ancestors</button>
+            <button type="button" class="button small" data-helper="descendants" disabled>+ Descendants</button>
+            <button type="button" class="button small" data-helper="family" disabled>+ Family</button>
+            <label class="check"><input id="with-spouses" type="checkbox" checked /> with spouses</label>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="people">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Name</th>
+                <th>Years</th>
+                <th>ID</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </aside>
+
+      <section class="tree-panel">
+        <div class="tree-toolbar">
+          <span class="hint">
+            <b>Drag</b> to select · <b>Shift</b>+drag adds · <b>Ctrl</b>+drag removes · <b>Click</b> toggles ·
+            <b>Right-drag</b> or <b>Space</b>+drag pans · <b>Wheel</b> zooms
+          </span>
+          <button id="fit-button" type="button" class="button small">Fit</button>
+        </div>
+        <div id="tree" class="tree"></div>
+      </section>
+    </main>
+
+    <footer id="actionbar" class="actionbar" hidden>
+      <span id="status" class="status"></span>
+      <span id="count" class="count"></span>
+      <button id="create-button" type="button" class="button primary" disabled>Create GEDCOM</button>
+    </footer>
+
+    <dialog id="preview" class="preview">
+      <form method="dialog" class="preview-inner">
+        <div class="preview-head">
+          <h2>Your new tree</h2>
+          <p id="preview-stats"></p>
+        </div>
+        <div id="preview-tree" class="tree preview-tree"></div>
+        <details>
+          <summary>Show GEDCOM text</summary>
+          <pre id="preview-text"></pre>
+        </details>
+        <div class="preview-actions">
+          <label>File name <input id="out-name" type="text" spellcheck="false" /></label>
+          <button id="download-button" type="button" class="button primary">Download .ged</button>
+          <button type="submit" class="button">Back to selection</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
