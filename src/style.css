@@ -362,19 +362,6 @@ tr.active td:first-child {
   cursor: grab;
   background: var(--bg);
 }
-details {
-  border-top: 1px solid var(--border);
-  padding: 8px 18px;
-  font-size: 13px;
-}
-details pre {
-  max-height: 200px;
-  overflow: auto;
-  font-size: 12px;
-  background: var(--bg);
-  padding: 8px;
-  border-radius: 6px;
-}
 .preview-actions {
   display: flex;
   flex-wrap: wrap;
