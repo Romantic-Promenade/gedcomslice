@@ -172,7 +172,6 @@ $('#search').addEventListener('input', (e) => state.list.filter(e.target.value))
 for (const b of document.querySelectorAll('[data-helper]'))
   b.addEventListener('click', () => applyHelper(b.dataset.helper));
 for (const b of document.querySelectorAll('[data-bulk]')) b.addEventListener('click', () => applyBulk(b.dataset.bulk));
-$('#fit-button').addEventListener('click', () => state.tree.fit());
 $('#create-button').addEventListener('click', openPreview);
 $('#download-button').addEventListener('click', download);
 

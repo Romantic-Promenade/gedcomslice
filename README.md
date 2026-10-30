@@ -9,7 +9,10 @@ Cut a part of a family tree out of a GEDCOM file and save it as a new GEDCOM.
      (parents, partners, children, siblings).
    - **Tree:** drag with the left mouse button to draw a selection rectangle.
      Shift+drag adds to the selection, Ctrl/Cmd+drag removes from it, a click
-     toggles one person. Right-drag or Space+drag pans, the wheel zooms.
+     toggles one person. Right-drag, Space+drag or the scrollbars pan
+     (Shift+wheel scrolls sideways). The mouse wheel, a trackpad pinch or the
+     **+ / −** buttons zoom; the percentage resets to 100% and the corner
+     button fits the whole tree.
 3. Press **Create GEDCOM**, check the preview of the new tree, and download it.
 
 Everything runs in the browser. The file is never uploaded anywhere.

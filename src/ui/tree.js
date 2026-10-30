@@ -2,6 +2,7 @@
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import { lifespan } from '../gedcom/model.js';
+import { attachViewport } from './viewport.js';
 
 cytoscape.use(dagre);
 
@@ -73,6 +74,7 @@ export function createTree(container, model, handlers = {}) {
     style: style(),
     layout: { name: 'dagre', rankDir: 'TB', nodeSep: 24, rankSep: 56, edgeSep: 10 },
     userPanningEnabled: !interactive,
+    userZoomingEnabled: false, // wheel, pinch and buttons are handled in viewport.js
     boxSelectionEnabled: false,
     autoungrabify: true,
     autounselectify: true,
@@ -81,7 +83,9 @@ export function createTree(container, model, handlers = {}) {
     wheelSensitivity: 0.3,
   });
 
+  const fit = () => cy.animate({ fit: { padding: 30 } }, { duration: 200 });
   const listeners = new AbortController();
+  attachViewport(container, cy, { fit }, listeners.signal);
   if (interactive) attachMouse(container, cy, handlers, listeners.signal);
 
   return {
@@ -105,6 +109,7 @@ export function createTree(container, model, handlers = {}) {
     destroy() {
       listeners.abort();
       cy.destroy();
+      container.replaceChildren(); // our overlays
     },
   };
 }
@@ -113,7 +118,6 @@ function attachMouse(container, cy, { onRect, onClick }, signal) {
   const box = document.createElement('div');
   box.className = 'select-box';
   box.hidden = true;
-  container.style.position = 'relative';
   container.appendChild(box);
 
   let spaceDown = false;
@@ -138,6 +142,7 @@ function attachMouse(container, cy, { onRect, onClick }, signal) {
   container.addEventListener(
     'mousedown',
     (e) => {
+      if (e.target.closest('.tree-controls, .scrollbar')) return;
       const { x, y } = local(e);
       const pan = e.button === 1 || e.button === 2 || (e.button === 0 && spaceDown);
       if (!pan && e.button !== 0) return;

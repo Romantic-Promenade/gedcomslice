@@ -413,3 +413,103 @@ details pre {
     display: none;
   }
 }
+
+/* Zoom buttons and scrollbars on the tree (src/ui/viewport.js) */
+.tree-controls {
+  position: absolute;
+  z-index: 20;
+  right: 22px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  overflow: hidden;
+  cursor: default;
+}
+.tree-controls button {
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tree-controls button:last-child {
+  border-bottom: 0;
+}
+.tree-controls button:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+.tree-controls button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.tree-controls .zoom-level {
+  height: 24px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tree-controls .fit svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
+
+.scrollbar {
+  position: absolute;
+  z-index: 15;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  cursor: default;
+}
+.scrollbar-x {
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 10px;
+}
+.scrollbar-y {
+  top: 4px;
+  bottom: 4px;
+  right: 4px;
+  width: 10px;
+}
+.both-scrollbars .scrollbar-x {
+  right: 18px;
+}
+.both-scrollbars .scrollbar-y {
+  bottom: 18px;
+}
+.scroll-thumb {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 32%, transparent);
+  touch-action: none;
+}
+.scrollbar-x .scroll-thumb {
+  right: auto;
+  min-width: 24px;
+}
+.scrollbar-y .scroll-thumb {
+  bottom: auto;
+  min-height: 24px;
+}
+.scroll-thumb:hover,
+.scrollbar.dragging .scroll-thumb {
+  background: color-mix(in srgb, var(--text) 50%, transparent);
+}
