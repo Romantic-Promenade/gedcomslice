@@ -121,7 +121,6 @@ function openPreview() {
 
   const extra = stats.other ? `, ${stats.other} sources, notes and other records` : '';
   $('#preview-stats').textContent = `${stats.people} people, ${stats.families} families${extra}.`;
-  $('#preview-text').textContent = text;
   const base = state.fileName.replace(/\.(ged|gedcom)$/i, '') || 'tree';
   $('#out-name').value = `${base}-slice.ged`;
 
