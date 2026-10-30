@@ -293,7 +293,8 @@ tr.active td:first-child {
   cursor: crosshair;
   user-select: none;
 }
-.tree.can-pan {
+.tree.can-pan,
+.tree.hand-mode {
   cursor: grab;
 }
 .tree.panning {
@@ -458,6 +459,19 @@ details pre {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+.tree-modes {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+}
+.tree-modes button:last-child {
+  border-bottom: 0;
+}
+.tree-controls .tree-modes button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.tree-modes svg,
 .tree-controls .fit svg {
   width: 16px;
   height: 16px;
@@ -467,6 +481,10 @@ details pre {
   stroke-linecap: round;
   stroke-linejoin: round;
   vertical-align: middle;
+}
+.tree-modes svg .fill {
+  fill: currentColor;
+  stroke-width: 1;
 }
 
 .scrollbar {

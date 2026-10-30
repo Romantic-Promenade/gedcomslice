@@ -1,4 +1,4 @@
-// Family tree chart with left-button rectangle selection.
+// Family tree chart with left-button rectangle selection, or panning in hand mode.
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import { lifespan } from '../gedcom/model.js';
@@ -114,11 +114,43 @@ export function createTree(container, model, handlers = {}) {
   };
 }
 
+// Kept across files, so opening another GEDCOM stays in the mode the user picked.
+let tool = 'select'; // 'select' | 'pan'
+
 function attachMouse(container, cy, { onRect, onClick }, signal) {
   const box = document.createElement('div');
   box.className = 'select-box';
   box.hidden = true;
   container.appendChild(box);
+
+  // Mode switch above the zoom buttons: what a plain left-drag does.
+  const modes = document.createElement('div');
+  modes.className = 'tree-modes';
+  modes.innerHTML = `
+    <button type="button" data-tool="select" title="Select (V): drag to pick people" aria-label="Select mode">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M3.5 1.5v11.2l3-2.9 2 4.6 2-.9-2-4.5h4.2z" /></svg>
+    </button>
+    <button type="button" data-tool="pan" title="Hand (H): drag to move the tree" aria-label="Hand mode">
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M5.5 8.5V3.2a1 1 0 0 1 2 0V7.5M7.5 7V2.2a1 1 0 0 1 2 0V7M9.5 7V3a1 1 0 0 1 2 0v4.5M11.5 7.5V5.2a1 1 0 0 1 2 0V10a5 5 0 0 1-5 5h-.8a4.5 4.5 0 0 1-3.4-1.6L1.9 10.6a1 1 0 0 1 1.5-1.3L5.5 11" />
+      </svg>
+    </button>`;
+  container.querySelector('.tree-controls').prepend(modes);
+
+  const setTool = (next) => {
+    tool = next;
+    container.classList.toggle('hand-mode', tool === 'pan');
+    for (const b of modes.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', b.dataset.tool === tool);
+  };
+  modes.addEventListener(
+    'click',
+    (e) => {
+      const next = e.target.closest('[data-tool]')?.dataset.tool;
+      if (next) setTool(next);
+    },
+    { signal },
+  );
+  setTool(tool);
 
   let spaceDown = false;
   let drag = null; // { kind: 'select'|'pan', x0, y0, x, y, mode }
@@ -144,7 +176,7 @@ function attachMouse(container, cy, { onRect, onClick }, signal) {
     (e) => {
       if (e.target.closest('.tree-controls, .scrollbar')) return;
       const { x, y } = local(e);
-      const pan = e.button === 1 || e.button === 2 || (e.button === 0 && spaceDown);
+      const pan = e.button === 1 || e.button === 2 || (e.button === 0 && (spaceDown || tool === 'pan'));
       if (!pan && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
@@ -201,7 +233,10 @@ function attachMouse(container, cy, { onRect, onClick }, signal) {
   window.addEventListener(
     'keydown',
     (e) => {
-      if (e.code === 'Space' && !isTyping(e)) {
+      if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.code === 'KeyV') setTool('select');
+      else if (e.code === 'KeyH') setTool('pan');
+      else if (e.code === 'Space') {
         spaceDown = true;
         container.classList.add('can-pan');
         if (e.target === document.body) e.preventDefault();
