@@ -1,0 +1,22 @@
+{
+  "name": "gedcomslice",
+  "version": "1.0.0",
+  "description": "Cut a subset of people out of a GEDCOM file, in the browser",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "cytoscape": "^3.34.4",
+    "cytoscape-dagre": "^2.5.0"
+  },
+  "devDependencies": {
+    "vite": "^6.4.5",
+    "vitest": "^3.2.7"
+  },
+  "private": true,
+  "type": "module"
+}
