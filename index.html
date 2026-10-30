@@ -61,6 +61,7 @@
             <button type="button" class="button small" data-helper="family" disabled>+ Family</button>
             <label class="check"><input id="with-spouses" type="checkbox" checked /> with spouses</label>
           </div>
+          <button id="main-button" type="button" class="button small" disabled>Make main person in the tree</button>
         </div>
         <div class="table-wrap">
           <table id="people">
@@ -79,10 +80,30 @@
 
       <section class="tree-panel">
         <div class="tree-toolbar">
+          <div class="view-bar">
+            <div class="segmented" role="group" aria-label="What the tree shows">
+              <button type="button" data-view="family">Family tree</button>
+              <button type="button" data-view="all">Everyone</button>
+            </div>
+            <span class="family-only main-line">Main person: <strong id="main-name"></strong></span>
+            <label class="family-only">
+              Generations up
+              <select id="gens-up"></select>
+            </label>
+            <label class="family-only">
+              down
+              <select id="gens-down"></select>
+            </label>
+            <span id="tree-note" class="tree-note" hidden>Very large tree: some branches stay closed.</span>
+          </div>
           <span class="hint">
             <b>Drag</b> to select · <b>Shift</b>+drag adds · <b>Ctrl</b>+drag removes · <b>Click</b> toggles ·
             <b>Right-drag</b>, <b>Space</b>+drag or the hand tool pans ·
             <b>Wheel</b> or <b>pinch</b> zooms
+          </span>
+          <span class="hint family-only">
+            <b>+</b> / <b>−</b> on a card opens or closes their parents (top) or children (bottom) ·
+            <b>Double-click</b> makes a person the main one
           </span>
         </div>
         <div id="tree" class="tree"></div>

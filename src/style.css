@@ -279,13 +279,59 @@ tr.active td:first-child {
 }
 .tree-toolbar {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 6px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   font-size: 12px;
   color: var(--muted);
+}
+.view-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: 13px;
+}
+.view-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.view-bar select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+.main-line strong {
+  color: var(--text);
+}
+.tree-note {
+  color: var(--active);
+}
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.segmented button {
+  padding: 4px 10px;
+  border: 0;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 .tree {
   flex: 1;
@@ -517,4 +563,7 @@ tr.active td:first-child {
 .scroll-thumb:hover,
 .scrollbar.dragging .scroll-thumb {
   background: color-mix(in srgb, var(--text) 50%, transparent);
+}
+#main-button {
+  justify-self: start;
 }

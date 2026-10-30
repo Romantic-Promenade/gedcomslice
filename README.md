@@ -3,6 +3,12 @@
 Cut a part of a family tree out of a GEDCOM file and save it as a new GEDCOM.
 
 1. Open a `.ged` file (or drop it on the page, or try the built-in sample).
+   The tree starts from one **main person**: parents and grandparents above,
+   partners beside, children below. The **+ / −** buttons on a card open or
+   close that person's parents (top) or children (bottom), and the
+   **Generations up / down** menus set how much is open. Click a name in the
+   list and press **Make main person in the tree**, or double-click a card, to
+   start the tree from someone else. **Everyone** shows all people at once.
 2. Pick people in either view; both share one selection:
    - **List:** tick checkboxes, search by name or ID, or click a name and use
      **+ Ancestors**, **+ Descendants** (optionally with spouses) or **+ Family**
@@ -39,7 +45,8 @@ npm run build   # production build in dist/
 ```
 
 Stack: [Vite](https://vite.dev), plain JavaScript, [Cytoscape.js](https://js.cytoscape.org)
-with the dagre layout for the tree.
+with the dagre layout for the "Everyone" chart. The main-person tree has its own
+layout in `src/gedcom/familyTree.js`.
 
 ## Deployment
 

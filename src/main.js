@@ -19,6 +19,8 @@ const state = {
   tree: null,
   previewTree: null,
   output: '',
+  // What the tree shows; kept across files except for the main person.
+  view: { kind: 'family', root: null, up: 3, down: 1 },
 };
 
 function setStatus(text) {
@@ -53,21 +55,29 @@ function load(buffer, fileName) {
     },
   });
 
+  state.view.root = model.people.keys().next().value;
   state.tree?.destroy();
-  state.tree = createTree($('#tree'), model, {
-    onRect: (ids, mode) => {
-      if (mode === 'replace') return setSelection(new Set(ids));
-      const next = new Set(state.selected);
-      for (const id of ids) mode === 'add' ? next.add(id) : next.delete(id);
-      setSelection(next);
+  state.tree = createTree(
+    $('#tree'),
+    model,
+    {
+      onRect: (ids, mode) => {
+        if (mode === 'replace') return setSelection(new Set(ids));
+        const next = new Set(state.selected);
+        for (const id of ids) mode === 'add' ? next.add(id) : next.delete(id);
+        setSelection(next);
+      },
+      onClick: (id) => {
+        const next = new Set(state.selected);
+        next.has(id) ? next.delete(id) : next.add(id);
+        setSelection(next);
+        setActive(id);
+      },
+      onDoubleClick: (id) => setMain(id),
     },
-    onClick: (id) => {
-      const next = new Set(state.selected);
-      next.has(id) ? next.delete(id) : next.add(id);
-      setSelection(next);
-      setActive(id);
-    },
-  });
+    viewOf(state.view),
+  );
+  showView();
   state.tree.fit();
 
   setSelection(new Set());
@@ -75,6 +85,30 @@ function load(buffer, fileName) {
   const note = warnings.length ? ` · ${warnings.length} unreadable lines skipped` : '';
   setStatus(`${model.people.size} people, ${model.families.size} families · ${encoding.toUpperCase()}${note}`);
   if (warnings.length) console.warn(warnings.join('\n'));
+}
+
+const viewOf = (v) => (v.kind === 'family' ? { ...v } : { kind: 'all' });
+
+function showView() {
+  const { view, model, tree } = state;
+  for (const b of document.querySelectorAll('[data-view]'))
+    b.setAttribute('aria-pressed', b.dataset.view === view.kind);
+  for (const el of document.querySelectorAll('.family-only')) el.hidden = view.kind !== 'family';
+  $('#main-name').textContent = model.people.get(view.root)?.name ?? '';
+  $('#tree-note').hidden = !tree.truncated;
+}
+
+function changeView(patch) {
+  Object.assign(state.view, patch);
+  state.tree.setView(viewOf(state.view));
+  showView();
+  state.tree.fit();
+}
+
+function setMain(id) {
+  if (!state.model.people.has(id)) return;
+  changeView({ kind: 'family', root: id });
+  setActive(id);
 }
 
 function setSelection(next) {
@@ -89,7 +123,7 @@ function setActive(id) {
   state.active = id ?? null;
   const p = id && state.model.people.get(id);
   $('#active-name').textContent = p ? p.name : 'click a name';
-  for (const b of document.querySelectorAll('[data-helper]')) b.disabled = !p;
+  for (const b of document.querySelectorAll('[data-helper], #main-button')) b.disabled = !p;
   state.list.setActive(id);
   state.tree.setActive(id);
 }
@@ -171,6 +205,19 @@ $('#search').addEventListener('input', (e) => state.list.filter(e.target.value))
 for (const b of document.querySelectorAll('[data-helper]'))
   b.addEventListener('click', () => applyHelper(b.dataset.helper));
 for (const b of document.querySelectorAll('[data-bulk]')) b.addEventListener('click', () => applyBulk(b.dataset.bulk));
+$('#main-button').addEventListener('click', () => setMain(state.active));
+for (const b of document.querySelectorAll('[data-view]'))
+  b.addEventListener('click', () => changeView({ kind: b.dataset.view }));
+for (const [sel, key] of [
+  ['#gens-up', 'up'],
+  ['#gens-down', 'down'],
+]) {
+  const select = $(sel);
+  for (let n = 0; n <= 10; n++) select.add(new Option(n, n));
+  select.add(new Option('all', 99));
+  select.value = state.view[key];
+  select.addEventListener('change', () => changeView({ [key]: Number(select.value) }));
+}
 $('#create-button').addEventListener('click', openPreview);
 $('#download-button').addEventListener('click', download);
 
