@@ -53,6 +53,12 @@ function load(buffer, fileName) {
       setActive(id);
       state.tree.focus(id);
     },
+    onReveal: (id) => {
+      setSelection(new Set([...state.selected, id]));
+      if (!state.tree.reveal(id)) setMain(id);
+      setActive(id);
+      state.tree.focus(id, { maxZoom: 1 });
+    },
   });
 
   state.view.root = model.people.keys().next().value;

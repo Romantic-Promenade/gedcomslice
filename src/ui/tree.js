@@ -1,7 +1,7 @@
 // Family tree chart with left-button rectangle selection, or panning in hand mode.
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
-import { CARD, layoutFamilyTree } from '../gedcom/familyTree.js';
+import { CARD, layoutFamilyTree, revealPath } from '../gedcom/familyTree.js';
 import { lifespan } from '../gedcom/model.js';
 import { attachViewport } from './viewport.js';
 
@@ -217,11 +217,26 @@ export function createTree(container, model, handlers = {}, view = { kind: 'all'
       active = id ?? null;
       mark();
     },
+    /**
+     * Open the cards on the shortest way from the people drawn now to this
+     * person. False when they can't be shown around the current main person.
+     */
+    reveal(id) {
+      if (nodesOf(id).nonempty()) return true;
+      if (view.kind !== 'family') return false;
+      const add = revealPath(model, view.root, id, { up: view.up, down: view.down, open });
+      if (!add) return false;
+      open = new Map([...open, ...add]);
+      draw(); // the main person stays where they are on screen
+      return nodesOf(id).nonempty();
+    },
     /** Whether the person is drawn now (not hidden in a closed branch). */
     has: (id) => nodesOf(id).nonempty(),
-    focus(id) {
+    /** Centre on the person, zoomed in to at least 80% (and at most `maxZoom`). */
+    focus(id, { maxZoom = Infinity } = {}) {
       const n = nodesOf(id);
-      if (n.nonempty()) cy.animate({ center: { eles: n[0] }, zoom: Math.max(cy.zoom(), 0.8) }, { duration: 250 });
+      const zoom = Math.min(Math.max(cy.zoom(), 0.8), maxZoom);
+      if (n.nonempty()) cy.animate({ center: { eles: n[0] }, zoom }, { duration: 250 });
     },
     restyle() {
       cy.style(style());

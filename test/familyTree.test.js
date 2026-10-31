@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, layoutFamilyTree } from '../src/gedcom/familyTree.js';
+import { CARD, layoutFamilyTree, revealPath } from '../src/gedcom/familyTree.js';
 
 // A model like buildModel makes, from [id, sex] people and [id, husb, wife, children] families.
 function makeModel(people, families) {
@@ -282,5 +282,57 @@ describe('family tree layout', () => {
     );
     const l = layoutFamilyTree(loop, 'A', { up: 99, down: 99 });
     expect(cards(l).length).toBeLessThan(10);
+  });
+});
+
+describe('revealPath', () => {
+  // R's grandfather G has another son U, whose daughter C has a son D;
+  // R's wife W has parents WP (not reachable around R).
+  const model = makeModel(
+    [
+      ['R', 'M'], ['F', 'M'], ['M', 'F'], ['G', 'M'], ['GM', 'F'], ['U', 'M'], ['C', 'F'], ['D', 'M'],
+      ['W', 'F'], ['WP', 'M'], ['K', 'U'], ['KK', 'U'], ['B', 'M'],
+    ],
+    [
+      ['FR', 'F', 'M', ['R', 'B']],
+      ['FG', 'G', 'GM', ['F', 'U']],
+      ['FU', 'U', null, ['C']],
+      ['FC', null, 'C', ['D']],
+      ['FW', 'WP', null, ['W']],
+      ['FRW', 'R', 'W', ['K']],
+      ['FK', 'K', null, ['KK']],
+    ],
+  );
+  const shows = (open, id, opts) =>
+    cards(layoutFamilyTree(model, 'R', { ...opts, open: new Map([...(opts.open ?? []), ...open]) })).some(
+      (n) => n.person === id,
+    );
+
+  it('opens nothing for someone already shown', () => {
+    expect(revealPath(model, 'R', 'B', { up: 1, down: 1 })).toEqual(new Map());
+  });
+
+  it("opens the line up to a cousin's child, and only that", () => {
+    const opts = { up: 0, down: 0 };
+    expect(shows(new Map(), 'D', opts)).toBe(false);
+    const add = revealPath(model, 'R', 'D', opts);
+    expect([...add.keys()].sort()).toEqual(['d:r.f.b1', 'd:r.f.b1.c0_0', 's:r.f', 'u:r', 'u:r.f']);
+    expect(shows(add, 'D', opts)).toBe(true);
+  });
+
+  it('starts from what the user already opened', () => {
+    const opts = { up: 0, down: 0, open: new Map([['u:r', true], ['u:r.f', true], ['s:r.f', true]]) };
+    const add = revealPath(model, 'R', 'C', opts);
+    expect([...add.keys()]).toEqual(['d:r.f.b1']);
+    expect(shows(add, 'C', opts)).toBe(true);
+  });
+
+  it('opens descendants', () => {
+    const add = revealPath(model, 'R', 'KK', { up: 0, down: 0 });
+    expect([...add.keys()].sort()).toEqual(['d:r', 'd:r.c0_0']);
+  });
+
+  it("gives up on people the main person's tree can't show", () => {
+    expect(revealPath(model, 'R', 'WP', { up: 9, down: 9 })).toBeNull();
   });
 });
