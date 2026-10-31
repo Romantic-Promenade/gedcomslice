@@ -312,27 +312,6 @@ tr.active td:first-child {
 .tree-note {
   color: var(--active);
 }
-.segmented {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.segmented button {
-  padding: 4px 10px;
-  border: 0;
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-.segmented button + button {
-  border-left: 1px solid var(--border);
-}
-.segmented button[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--on-accent);
-}
 .tree {
   flex: 1;
   min-height: 0;

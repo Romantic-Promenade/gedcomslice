@@ -20,7 +20,7 @@ const state = {
   previewTree: null,
   output: '',
   // What the tree shows; kept across files except for the main person.
-  view: { kind: 'family', root: null, up: 3, down: 1 },
+  view: { root: null, up: 3, down: 1 },
 };
 
 function setStatus(text) {
@@ -81,7 +81,7 @@ function load(buffer, fileName) {
       },
       onDoubleClick: (id) => setMain(id),
     },
-    viewOf(state.view),
+    { ...state.view },
   );
   showView();
   state.tree.fit();
@@ -93,27 +93,22 @@ function load(buffer, fileName) {
   if (warnings.length) console.warn(warnings.join('\n'));
 }
 
-const viewOf = (v) => (v.kind === 'family' ? { ...v } : { kind: 'all' });
-
 function showView() {
   const { view, model, tree } = state;
-  for (const b of document.querySelectorAll('[data-view]'))
-    b.setAttribute('aria-pressed', b.dataset.view === view.kind);
-  for (const el of document.querySelectorAll('.family-only')) el.hidden = view.kind !== 'family';
   $('#main-name').textContent = model.people.get(view.root)?.name ?? '';
   $('#tree-note').hidden = !tree.truncated;
 }
 
 function changeView(patch) {
   Object.assign(state.view, patch);
-  state.tree.setView(viewOf(state.view));
+  state.tree.setView({ ...state.view });
   showView();
   state.tree.fit();
 }
 
 function setMain(id) {
   if (!state.model.people.has(id)) return;
-  changeView({ kind: 'family', root: id });
+  changeView({ root: id });
   setActive(id);
 }
 
@@ -212,8 +207,6 @@ for (const b of document.querySelectorAll('[data-helper]'))
   b.addEventListener('click', () => applyHelper(b.dataset.helper));
 for (const b of document.querySelectorAll('[data-bulk]')) b.addEventListener('click', () => applyBulk(b.dataset.bulk));
 $('#main-button').addEventListener('click', () => setMain(state.active));
-for (const b of document.querySelectorAll('[data-view]'))
-  b.addEventListener('click', () => changeView({ kind: b.dataset.view }));
 for (const [sel, key] of [
   ['#gens-up', 'up'],
   ['#gens-down', 'down'],

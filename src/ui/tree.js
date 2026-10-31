@@ -1,4 +1,6 @@
 // Family tree chart with left-button rectangle selection, or panning in hand mode.
+// The main chart is the tree around one main person; the preview of the new
+// file shows everyone in it at once, laid out by dagre.
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import { CARD, layoutFamilyTree, revealPath } from '../gedcom/familyTree.js';
@@ -15,7 +17,7 @@ const personData = (p) => {
   return { person: p.id, label: years ? `${p.name}\n${years}` : p.name, sex: p.sex };
 };
 
-// Everyone at once, laid out by dagre.
+// Everyone at once, laid out by dagre (the preview of the new file).
 function allElements(model) {
   const els = [];
   for (const p of model.people.values()) els.push({ data: { id: p.id, ...personData(p) }, classes: 'person' });
@@ -130,10 +132,10 @@ function style() {
  *   onDoubleClick?: (id: string) => void,
  * }} handlers
  *   Leave out the handlers for a read-only chart.
- * @param {{ kind: 'all' } | { kind: 'family', root: string, up: number, down: number }} view
- *   Everyone at once, or the tree around a main person.
+ * @param {{ root: string, up: number, down: number }} [view]
+ *   The tree around a main person. Leave it out to show everyone at once.
  */
-export function createTree(container, model, handlers = {}, view = { kind: 'all' }) {
+export function createTree(container, model, handlers = {}, view = null) {
   const interactive = Boolean(handlers.onRect);
   const cy = cytoscape({
     container,
@@ -167,7 +169,7 @@ export function createTree(container, model, handlers = {}, view = { kind: 'all'
     const before = anchor && cy.getElementById(anchor).renderedPosition();
     cy.batch(() => {
       cy.elements().remove();
-      if (view.kind === 'family') {
+      if (view) {
         const layout = layoutFamilyTree(model, view.root, { up: view.up, down: view.down, open });
         truncated = layout.truncated;
         cy.add(familyElements(model, layout));
@@ -176,7 +178,7 @@ export function createTree(container, model, handlers = {}, view = { kind: 'all'
         cy.add(allElements(model));
       }
     });
-    if (view.kind === 'all') cy.layout({ name: 'dagre', rankDir: 'TB', nodeSep: 24, rankSep: 56, edgeSep: 10 }).run();
+    if (!view) cy.layout({ name: 'dagre', rankDir: 'TB', nodeSep: 24, rankSep: 56, edgeSep: 10 }).run();
     mark();
     const after = before && cy.getElementById(anchor);
     if (after?.nonempty()) {
@@ -203,7 +205,7 @@ export function createTree(container, model, handlers = {}, view = { kind: 'all'
     get truncated() {
       return truncated;
     },
-    /** Switch between everyone and the tree around a main person; opened cards are forgotten. */
+    /** Change the main person or generations; opened cards are forgotten. */
     setView(next) {
       view = next;
       open = new Map();
@@ -223,7 +225,7 @@ export function createTree(container, model, handlers = {}, view = { kind: 'all'
      */
     reveal(id) {
       if (nodesOf(id).nonempty()) return true;
-      if (view.kind !== 'family') return false;
+      if (!view) return false;
       const add = revealPath(model, view.root, id, { up: view.up, down: view.down, open });
       if (!add) return false;
       open = new Map([...open, ...add]);
