@@ -1,6 +1,7 @@
 // Family tree chart with left-button rectangle selection, or panning in hand mode.
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
+import { CARD, layoutFamilyTree } from '../gedcom/familyTree.js';
 import { lifespan } from '../gedcom/model.js';
 import { attachViewport } from './viewport.js';
 
@@ -9,12 +10,15 @@ cytoscape.use(dagre);
 const FAMILY = 'fam:';
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-function elements(model) {
+const personData = (p) => {
+  const years = lifespan(p);
+  return { person: p.id, label: years ? `${p.name}\n${years}` : p.name, sex: p.sex };
+};
+
+// Everyone at once, laid out by dagre.
+function allElements(model) {
   const els = [];
-  for (const p of model.people.values()) {
-    const years = lifespan(p);
-    els.push({ data: { id: p.id, label: years ? `${p.name}\n${years}` : p.name, sex: p.sex }, classes: 'person' });
-  }
+  for (const p of model.people.values()) els.push({ data: { id: p.id, ...personData(p) }, classes: 'person' });
   for (const f of model.families.values()) {
     const fid = FAMILY + f.id;
     els.push({ data: { id: fid }, classes: 'family' });
@@ -22,6 +26,36 @@ function elements(model) {
       if (parent && model.people.has(parent)) els.push({ data: { source: parent, target: fid } });
     }
     for (const c of f.children) if (model.people.has(c)) els.push({ data: { source: fid, target: c } });
+  }
+  return els;
+}
+
+// The tree around one main person, with +/− buttons on the cards.
+function familyElements(model, layout) {
+  const els = [];
+  for (const n of layout.nodes) {
+    if (n.kind === 'family') {
+      els.push({ data: { id: n.id }, position: { x: n.x, y: n.y }, classes: 'family' });
+      continue;
+    }
+    const data = { id: n.id, ...personData(model.people.get(n.person)) };
+    els.push({ data, position: { x: n.x, y: n.y }, classes: n.root ? 'person main' : 'person' });
+    for (const [dir, state, dy] of [
+      ['u', n.up, -CARD.h / 2],
+      ['d', n.down, CARD.h / 2],
+    ]) {
+      if (!state) continue;
+      els.push({
+        data: { id: `t:${dir}:${n.key}`, key: n.key, dir, label: state === 'open' ? '−' : '+' },
+        position: { x: n.x + CARD.w / 2 - 16, y: n.y + dy },
+        classes: `toggle ${state}`,
+      });
+    }
+  }
+  for (const e of layout.edges) {
+    const data = { source: e.source, target: e.target };
+    if (e.turn !== undefined) data.turn = e.turn;
+    els.push({ data, classes: e.couple ? 'couple' : '' });
   }
   return els;
 }
@@ -54,6 +88,27 @@ function style() {
       selector: 'edge',
       style: { width: 1.5, 'line-color': css('--edge'), 'curve-style': 'taxi', 'taxi-direction': 'vertical' },
     },
+    { selector: 'edge.couple', style: { 'curve-style': 'straight' } },
+    { selector: 'edge[turn]', style: { 'taxi-turn': 'data(turn)', 'taxi-turn-min-distance': 4 } },
+    {
+      selector: 'node.toggle',
+      style: {
+        shape: 'ellipse',
+        width: 18,
+        height: 18,
+        'background-color': css('--node-bg'),
+        'border-width': 1.5,
+        'border-color': css('--edge'),
+        label: 'data(label)',
+        color: css('--text'),
+        'font-size': 14,
+        'font-weight': 'bold',
+        'text-valign': 'center',
+        'text-halign': 'center',
+      },
+    },
+    { selector: 'node.toggle.closed', style: { 'border-color': css('--accent'), color: css('--accent') } },
+    { selector: 'node.person.main', style: { 'border-width': 3, 'font-weight': 'bold' } },
     { selector: 'node.picked', style: { 'background-color': css('--accent'), color: css('--on-accent') } },
     { selector: 'node.active', style: { 'border-width': 4, 'border-color': css('--active') } },
     { selector: 'node.dim', style: { opacity: 0.35 } },
@@ -63,16 +118,20 @@ function style() {
 /**
  * @param {HTMLElement} container
  * @param {{ people: Map, families: Map }} model
- * @param {{ onRect?: (ids: string[], mode: 'replace'|'add'|'remove') => void, onClick?: (id: string) => void }} handlers
+ * @param {{
+ *   onRect?: (ids: string[], mode: 'replace'|'add'|'remove') => void,
+ *   onClick?: (id: string) => void,
+ *   onDoubleClick?: (id: string) => void,
+ * }} handlers
  *   Leave out the handlers for a read-only chart.
+ * @param {{ kind: 'all' } | { kind: 'family', root: string, up: number, down: number }} view
+ *   Everyone at once, or the tree around a main person.
  */
-export function createTree(container, model, handlers = {}) {
+export function createTree(container, model, handlers = {}, view = { kind: 'all' }) {
   const interactive = Boolean(handlers.onRect);
   const cy = cytoscape({
     container,
-    elements: elements(model),
     style: style(),
-    layout: { name: 'dagre', rankDir: 'TB', nodeSep: 24, rankSep: 56, edgeSep: 10 },
     userPanningEnabled: !interactive,
     userZoomingEnabled: false, // wheel, pinch and buttons are handled in viewport.js
     boxSelectionEnabled: false,
@@ -83,24 +142,80 @@ export function createTree(container, model, handlers = {}) {
     wheelSensitivity: 0.3,
   });
 
+  let selected = new Set();
+  let active = null;
+  let open = new Map(); // cards the user opened or closed, see layoutFamilyTree
+  let truncated = false;
+
+  const nodesOf = (id) => cy.nodes('.person').filter((n) => n.data('person') === id);
+  const mark = () =>
+    cy.batch(() => {
+      cy.nodes('.person').forEach((n) => {
+        n.toggleClass('picked', selected.has(n.data('person')));
+        n.toggleClass('active', n.data('person') === active);
+      });
+    });
+
+  // Redraw; `anchor` is a node id that should stay where it is on screen.
+  const draw = (anchor) => {
+    const before = anchor && cy.getElementById(anchor).renderedPosition();
+    cy.batch(() => {
+      cy.elements().remove();
+      if (view.kind === 'family') {
+        const layout = layoutFamilyTree(model, view.root, { up: view.up, down: view.down, open });
+        truncated = layout.truncated;
+        cy.add(familyElements(model, layout));
+      } else {
+        truncated = false;
+        cy.add(allElements(model));
+      }
+    });
+    if (view.kind === 'all') cy.layout({ name: 'dagre', rankDir: 'TB', nodeSep: 24, rankSep: 56, edgeSep: 10 }).run();
+    mark();
+    const after = before && cy.getElementById(anchor);
+    if (after?.nonempty()) {
+      const now = after.renderedPosition();
+      cy.panBy({ x: before.x - now.x, y: before.y - now.y });
+    }
+  };
+  draw();
+
+  const toggle = (key, dir) => {
+    const id = `${dir}:${key}`;
+    const node = cy.getElementById(`t:${id}`);
+    open.set(id, !node.hasClass('open'));
+    draw(`n:${key}`);
+  };
+
   const fit = () => cy.animate({ fit: { padding: 30 } }, { duration: 200 });
   const listeners = new AbortController();
   attachViewport(container, cy, { fit }, listeners.signal);
-  if (interactive) attachMouse(container, cy, handlers, listeners.signal);
+  if (interactive) attachMouse(container, cy, { ...handlers, onToggle: toggle }, listeners.signal);
 
   return {
     cy,
-    setSelection(selected) {
-      cy.batch(() => cy.nodes('.person').forEach((n) => n.toggleClass('picked', selected.has(n.id()))));
+    get truncated() {
+      return truncated;
+    },
+    /** Switch between everyone and the tree around a main person; opened cards are forgotten. */
+    setView(next) {
+      view = next;
+      open = new Map();
+      draw();
+    },
+    setSelection(next) {
+      selected = next;
+      mark();
     },
     setActive(id) {
-      cy.nodes('.active').removeClass('active');
-      const n = id && cy.getElementById(id);
-      if (n && n.nonempty()) n.addClass('active');
+      active = id ?? null;
+      mark();
     },
+    /** Whether the person is drawn now (not hidden in a closed branch). */
+    has: (id) => nodesOf(id).nonempty(),
     focus(id) {
-      const n = cy.getElementById(id);
-      if (n.nonempty()) cy.animate({ center: { eles: n }, zoom: Math.max(cy.zoom(), 0.8) }, { duration: 250 });
+      const n = nodesOf(id);
+      if (n.nonempty()) cy.animate({ center: { eles: n[0] }, zoom: Math.max(cy.zoom(), 0.8) }, { duration: 250 });
     },
     restyle() {
       cy.style(style());
@@ -117,7 +232,7 @@ export function createTree(container, model, handlers = {}) {
 // Kept across files, so opening another GEDCOM stays in the mode the user picked.
 let tool = 'select'; // 'select' | 'pan'
 
-function attachMouse(container, cy, { onRect, onClick }, signal) {
+function attachMouse(container, cy, { onRect, onClick, onDoubleClick, onToggle }, signal) {
   const box = document.createElement('div');
   box.className = 'select-box';
   box.hidden = true;
@@ -160,14 +275,14 @@ function attachMouse(container, cy, { onRect, onClick }, signal) {
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
 
-  const personsIn = (x1, y1, x2, y2) =>
-    cy
-      .nodes('.person')
-      .filter((n) => {
-        const b = n.renderedBoundingBox({ includeLabels: false });
-        return b.x1 < x2 && b.x2 > x1 && b.y1 < y2 && b.y2 > y1;
-      })
-      .map((n) => n.id());
+  const nodesIn = (selector, x1, y1, x2, y2) =>
+    cy.nodes(selector).filter((n) => {
+      const b = n.renderedBoundingBox({ includeLabels: false });
+      return b.x1 < x2 && b.x2 > x1 && b.y1 < y2 && b.y2 > y1;
+    });
+  // A person can be drawn twice (cousin marriages), so report each one once.
+  const personsIn = (...box) => [...new Set(nodesIn('.person', ...box).map((n) => n.data('person')))];
+  let lastClick = null; // { id, time } for double-clicks
 
   container.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
 
@@ -219,8 +334,20 @@ function attachMouse(container, cy, { onRect, onClick }, signal) {
       container.classList.remove('panning');
       if (d.kind !== 'select') return;
       if (box.hidden) {
+        const [t] = nodesIn('.toggle', d.x0, d.y0, d.x0 + 1, d.y0 + 1);
+        if (t) return onToggle(t.data('key'), t.data('dir'));
         const [id] = personsIn(d.x0, d.y0, d.x0 + 1, d.y0 + 1);
-        if (id) onClick(id);
+        if (!id) return;
+        onClick(id);
+        // The two clicks of a double-click toggle the person on and off again,
+        // so a double-click leaves the selection as it was.
+        const now = Date.now();
+        if (onDoubleClick && lastClick?.id === id && now - lastClick.time < 400) {
+          lastClick = null;
+          onDoubleClick(id);
+        } else {
+          lastClick = { id, time: now };
+        }
         return;
       }
       box.hidden = true;
