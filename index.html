@@ -81,16 +81,12 @@
       <section class="tree-panel">
         <div class="tree-toolbar">
           <div class="view-bar">
-            <div class="segmented" role="group" aria-label="What the tree shows">
-              <button type="button" data-view="family">Family tree</button>
-              <button type="button" data-view="all">Everyone</button>
-            </div>
-            <span class="family-only main-line">Main person: <strong id="main-name"></strong></span>
-            <label class="family-only">
+            <span class="main-line">Main person: <strong id="main-name"></strong></span>
+            <label>
               Generations up
               <select id="gens-up"></select>
             </label>
-            <label class="family-only">
+            <label>
               down
               <select id="gens-down"></select>
             </label>
@@ -100,7 +96,7 @@
             <b>Drag</b> to select · <b>Shift</b>+drag adds · <b>Ctrl</b>+drag removes · <b>Click</b> toggles ·
             <b>Right-drag</b>, <b>Space</b>+drag or the hand tool pans · <b>Wheel</b> or <b>pinch</b> zooms
           </span>
-          <span class="hint family-only">
+          <span class="hint">
             <b>+</b> / <b>−</b> on a card opens or closes their parents (top), children (bottom) or brothers and sisters
             (<b>+2</b>, <b>+3</b>…) · <b>Double-click</b> makes a person the main one
           </span>
