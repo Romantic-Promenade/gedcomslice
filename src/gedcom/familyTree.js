@@ -89,10 +89,11 @@ export function layoutFamilyTree(model, root, { up = 3, down = 1, open = new Map
   const pushPerson = (person, key, x, y, extra) =>
     nodes.push({ id: `n:${key}`, key, kind: 'person', person, x, y, up: null, down: null, sib: null, ...extra });
 
-  // A person with their partners beside them and their children below (rows >= 0).
-  function measureDown(id, key, depth, path) {
+  // A person with their partners beside them and their children below (rows >= 0),
+  // at most `limit` generations down.
+  function measureDown(id, key, depth, path, limit = Infinity) {
     cards++;
-    const fams = familiesOf(model, id);
+    const fams = limit > 0 ? familiesOf(model, id) : [];
     const state = fams.length ? (isOpen('d', key, depth) && room() ? 'open' : 'closed') : null;
     if (state !== 'open') {
       return { contour: cardContour(), draw: (x, y, card) => pushPerson(id, key, x, y, { down: state, ...card }) };
@@ -114,7 +115,10 @@ export function layoutFamilyTree(model, root, { up = 3, down = 1, open = new Map
         dot: { x: f.spouse ? sx / 2 : 0, y: beside ? 0 : busY(i) - 10 },
         kids: f.children
           .filter((c) => !next.has(c))
-          .map((c, j) => ({ key: `${key}.c${i}_${j}`, ...measureDown(c, `${key}.c${i}_${j}`, depth + 1, next) })),
+          .map((c, j) => ({
+            key: `${key}.c${i}_${j}`,
+            ...measureDown(c, `${key}.c${i}_${j}`, depth + 1, next, limit - 1),
+          })),
       };
     });
 
@@ -159,7 +163,8 @@ export function layoutFamilyTree(model, root, { up = 3, down = 1, open = new Map
 
   // The main person or one of their ancestors: parents above, and brothers and
   // sisters beside them on `side`, away from their partner (father's left, mother's right).
-  function measureLine(id, key, depth, path, side) {
+  // `chain` lists the sides of the line below them, down to the main person (null).
+  function measureLine(id, key, depth, path, side, chain) {
     const isRoot = key === 'r';
     let base;
     if (isRoot) base = measureDown(id, key, 0, path);
@@ -186,59 +191,64 @@ export function layoutFamilyTree(model, root, { up = 3, down = 1, open = new Map
       card.sib = (open.get(`s:${key}`) ?? isRoot) ? 'open' : 'closed'; // the main person's are open at first
     }
     if (card.sib === 'open') {
+      // Their descendants come down beside the line. Where the line switches from
+      // a father to a mother (or back), they would land between that couple on
+      // the couple's row and tangle with its line, so they stop a row before.
+      const sides = [side, ...chain];
+      let limit = Infinity;
+      for (let j = 1; j < sides.length && sides[j] !== null; j++) {
+        if (sides[j] !== sides[j - 1]) {
+          limit = j - 1;
+          break;
+        }
+      }
       // Nearest first, so that they read in birth order from left to right.
       for (const s of side < 0 ? [...sibIds].reverse() : sibIds) {
         const skey = `${key}.b${fam.children.indexOf(s)}`;
-        const b = measureDown(s, skey, Infinity, next);
+        const b = measureDown(s, skey, Infinity, next, limit);
         const x = side < 0 ? -clearance(b.contour, contour) : clearance(contour, b.contour);
         contour = merge(contour, shift(b.contour, x));
         sibs.push({ key: skey, block: b, x });
       }
     }
 
-    const F = father && measureLine(father, `${key}.f`, depth + 1, next, -1);
-    const M = mother && measureLine(mother, `${key}.m`, depth + 1, next, 1);
+    const below = [isRoot ? null : side, ...chain];
+    const F = father && measureLine(father, `${key}.f`, depth + 1, next, -1, below);
+    const M = mother && measureLine(mother, `${key}.m`, depth + 1, next, 1, below);
     const Fc = F && shift(F.contour, 0, -1);
     const Mc = M && shift(M.contour, 0, -1);
-    let fx = 0;
-    let mx = 0;
-    if (F && M) {
-      // Push the two parents apart until their branches clear each other and this row.
-      const d = Math.max((CARD.w + COUPLE) / 2, clearance(Fc, Mc) / 2, clearance(Fc, contour), clearance(contour, Mc));
-      fx = -d;
-      mx = d;
-    } else if (F) fx = Math.min(0, -clearance(Fc, contour));
-    else mx = Math.max(0, clearance(contour, Mc));
+    // The parents' dot sits right above this person, the parents to either side of
+    // it (a single known parent too), pushed apart until their branches clear
+    // each other and this row.
+    const half = (CARD.w + COUPLE) / 2;
+    let d = Math.max(half, F ? clearance(Fc, contour) : 0, M ? clearance(contour, Mc) : 0);
+    if (F && M) d = Math.max(d, clearance(Fc, Mc) / 2);
+    const fx = -d;
+    const mx = d;
     contour = merge(contour, Fc && shift(Fc, fx), Mc && shift(Mc, mx));
 
     const draw = (x, y) => {
       base.draw(x, y, card);
       const py = y - ROW;
-      let source;
-      let turn = {}; // a bracket at its own height under a family dot
-      if (F && M) {
-        source = `n:${key}.P`;
-        turn = { turn: LINE_TURN };
-        nodes.push({ id: source, kind: 'family', x, y: py });
-        F.draw(x + fx, py);
-        M.draw(x + mx, py);
-        edges.push(
-          { source: `n:${key}.f`, target: source, couple: true },
-          { source: `n:${key}.m`, target: source, couple: true },
-        );
-      } else {
-        (F ?? M).draw(x + fx + mx, py);
-        source = `n:${key}.${F ? 'f' : 'm'}`;
+      const source = `n:${key}.P`;
+      nodes.push({ id: source, kind: 'family', x, y: py });
+      for (const [P, px, tag] of [
+        [F, fx, 'f'],
+        [M, mx, 'm'],
+      ]) {
+        if (!P) continue;
+        P.draw(x + px, py);
+        edges.push({ source: `n:${key}.${tag}`, target: source, couple: true });
       }
-      edges.push({ source, target: `n:${key}`, ...turn });
+      edges.push({ source, target: `n:${key}`, turn: LINE_TURN });
       for (const s of sibs) {
         s.block.draw(x + s.x, y);
-        edges.push({ source, target: `n:${s.key}`, ...turn });
+        edges.push({ source, target: `n:${s.key}`, turn: LINE_TURN });
       }
     };
     return { contour, draw };
   }
 
-  if (model.people.has(root)) measureLine(root, 'r', 0, new Set(), -1).draw(0, 0);
+  if (model.people.has(root)) measureLine(root, 'r', 0, new Set(), -1, []).draw(0, 0);
   return { nodes, edges, truncated };
 }
