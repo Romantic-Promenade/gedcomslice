@@ -118,6 +118,59 @@ describe('family tree layout', () => {
     expect(l.truncated).toBe(false);
   });
 
+  it("shows the main person's brothers and sisters, and opens ancestors' ones on request", () => {
+    const m = makeModel(
+      [
+        ['R', 'M'],
+        ['B', 'M'],
+        ['S', 'F'],
+        ['D', 'M'],
+        ['M', 'F'],
+        ['U', 'M'],
+        ['GD', 'M'],
+        ['GM', 'F'],
+      ],
+      [
+        ['F1', 'D', 'M', ['B', 'R', 'S']],
+        ['F2', 'GD', 'GM', ['U', 'D']],
+      ],
+    );
+    const l = layoutFamilyTree(m, 'R');
+    expect(at(l, 'R')).toMatchObject({ sib: 'open', siblings: 2, side: -1 });
+    // Both on the left of the main person, in birth order, joined to the parents' dot.
+    expect(at(l, 'B').x).toBeLessThan(at(l, 'S').x);
+    expect(at(l, 'S').x).toBeLessThan(at(l, 'R').x);
+    expect(l.edges).toContainEqual(expect.objectContaining({ source: 'n:r.P', target: `n:${at(l, 'B').key}` }));
+    // The father's brother is hidden at first, then goes on the father's outer (left) side.
+    expect(at(l, 'D')).toMatchObject({ sib: 'closed', siblings: 1 });
+    expect(at(l, 'U')).toBeUndefined();
+    const opened = layoutFamilyTree(m, 'R', { open: new Map([['s:r.f', true]]) });
+    expect(at(opened, 'U').x).toBeLessThan(at(opened, 'D').x);
+    expect(overlaps(opened)).toEqual([]);
+  });
+
+  it('never overlaps cards with every brother, sister and child opened', () => {
+    const model = bigModel();
+    // Siblings: everyone in the ancestor families gets two children.
+    for (const fam of model.families.values()) {
+      if (fam.children.length !== 2 || !fam.children[1].startsWith('P')) continue;
+      const extra = `X${fam.id}`;
+      model.people.set(extra, { id: extra, sex: 'M', famc: [fam.id], fams: [] });
+      fam.children.push(extra);
+    }
+    const open = new Map();
+    let l;
+    for (let round = 0; round < 12; round++) {
+      l = layoutFamilyTree(model, 'R', { up: 4, down: 2, open });
+      const closed = cards(l).flatMap((c) => [c.sib === 'closed' && `s:${c.key}`, c.down === 'closed' && `d:${c.key}`]);
+      const fresh = closed.filter((k) => k && !open.has(k));
+      if (!fresh.length) break;
+      for (const k of fresh) open.set(k, true);
+    }
+    expect(cards(l).length).toBeGreaterThan(300);
+    expect(overlaps(l)).toEqual([]);
+  });
+
   it('stops at loops in broken files', () => {
     const loop = makeModel(
       [

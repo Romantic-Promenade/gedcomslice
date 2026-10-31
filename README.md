@@ -5,7 +5,9 @@ Cut a part of a family tree out of a GEDCOM file and save it as a new GEDCOM.
 1. Open a `.ged` file (or drop it on the page, or try the built-in sample).
    The tree starts from one **main person**: parents and grandparents above,
    partners beside, children below. The **+ / −** buttons on a card open or
-   close that person's parents (top) or children (bottom), and the
+   close that person's parents (top) or children (bottom). On the main person
+   and their ancestors, the **+2**, **+3**… button shows their brothers and
+   sisters, whose own children open the same way. The
    **Generations up / down** menus set how much is open. Click a name in the
    list and press **Make main person in the tree**, or double-click a card, to
    start the tree from someone else. **Everyone** shows all people at once.

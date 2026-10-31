@@ -40,15 +40,20 @@ function familyElements(model, layout) {
     }
     const data = { id: n.id, ...personData(model.people.get(n.person)) };
     els.push({ data, position: { x: n.x, y: n.y }, classes: n.root ? 'person main' : 'person' });
-    for (const [dir, state, dy] of [
-      ['u', n.up, -CARD.h / 2],
-      ['d', n.down, CARD.h / 2],
+    // Parents on the top corner towards the partner, brothers and sisters on the
+    // other top corner (showing how many there are), children bottom right.
+    const corner = CARD.w / 2 - 16;
+    const side = n.side ?? -1;
+    for (const [dir, state, dx, dy, closed] of [
+      ['u', n.up, -side * corner, -CARD.h / 2, '+'],
+      ['s', n.sib, side * corner, -CARD.h / 2, `+${n.siblings}`],
+      ['d', n.down, corner, CARD.h / 2, '+'],
     ]) {
       if (!state) continue;
       els.push({
-        data: { id: `t:${dir}:${n.key}`, key: n.key, dir, label: state === 'open' ? '−' : '+' },
-        position: { x: n.x + CARD.w / 2 - 16, y: n.y + dy },
-        classes: `toggle ${state}`,
+        data: { id: `t:${dir}:${n.key}`, key: n.key, dir, label: state === 'open' ? '−' : closed },
+        position: { x: n.x + dx, y: n.y + dy },
+        classes: `toggle ${state}${dir === 's' ? ' siblings' : ''}`,
       });
     }
   }
@@ -107,6 +112,7 @@ function style() {
         'text-halign': 'center',
       },
     },
+    { selector: 'node.toggle.siblings', style: { shape: 'round-rectangle', width: 28, 'font-size': 11 } },
     { selector: 'node.toggle.closed', style: { 'border-color': css('--accent'), color: css('--accent') } },
     { selector: 'node.person.main', style: { 'border-width': 3, 'font-weight': 'bold' } },
     { selector: 'node.picked', style: { 'background-color': css('--accent'), color: css('--on-accent') } },
