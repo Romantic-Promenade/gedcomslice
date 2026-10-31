@@ -252,3 +252,87 @@ export function layoutFamilyTree(model, root, { up = 3, down = 1, open = new Map
   if (model.people.has(root)) measureLine(root, 'r', 0, new Set(), -1, []).draw(0, 0);
   return { nodes, edges, truncated };
 }
+
+/**
+ * The cards to open so that `target` shows up in the tree, taking the shortest
+ * way from the people already drawn: each hidden person on the way counts one
+ * step, people already drawn none. Follows the same rules as layoutFamilyTree:
+ * parents and brothers and sisters only on the main person's line, partners and
+ * children below the main person and below brothers and sisters.
+ * @returns {Map<string, boolean> | null} `open` entries to add, or null when the
+ *   person can't be shown around this main person (a partner's parents, say).
+ */
+export function revealPath(model, root, target, { up = 3, down = 1, open = new Map(), maxSteps = 200000 } = {}) {
+  if (!model.people.has(root) || !model.people.has(target)) return null;
+  const isOpen = (dir, key, depth) => open.get(`${dir}:${key}`) ?? depth < (dir === 'u' ? up : down);
+
+  // Cards one toggle away from card `n`, each with the toggles it needs.
+  function* next(n) {
+    const inPath = new Set(n.path).add(n.id);
+    if (n.line) {
+      const fam = parentFamily(model, n.id);
+      const known = (p) => (p && model.people.has(p) && !inPath.has(p) ? p : null);
+      const father = known(fam?.husb);
+      const mother = known(fam?.wife);
+      if (father || mother) {
+        const below = [n.key === 'r' ? null : n.side, ...n.chain];
+        const u = [`u:${n.key}`, isOpen('u', n.key, n.depth)];
+        for (const [p, tag, side] of [
+          [father, 'f', -1],
+          [mother, 'm', 1],
+        ]) {
+          if (p) yield { id: p, key: `${n.key}.${tag}`, line: true, depth: n.depth + 1, path: inPath, side, chain: below, needs: [u] };
+        }
+        const sides = [n.side, ...n.chain];
+        let limit = Infinity;
+        for (let j = 1; j < sides.length && sides[j] !== null; j++) {
+          if (sides[j] !== sides[j - 1]) {
+            limit = j - 1;
+            break;
+          }
+        }
+        const s = [`s:${n.key}`, open.get(`s:${n.key}`) ?? n.key === 'r'];
+        for (const c of fam.children) {
+          if (c === n.id || !model.people.has(c) || inPath.has(c)) continue;
+          const key = `${n.key}.b${fam.children.indexOf(c)}`;
+          yield { id: c, key, down: true, depth: Infinity, path: inPath, limit, needs: [u, s] };
+        }
+      }
+    }
+    if (n.down && n.limit > 0) {
+      const d = [`d:${n.key}`, isOpen('d', n.key, n.depth)];
+      const fams = familiesOf(model, n.id);
+      for (const [i, f] of fams.entries()) {
+        if (f.spouse) yield { id: f.spouse, key: `${n.key}.s${i}`, path: inPath, needs: [d] };
+        const kids = f.children.filter((c) => !inPath.has(c));
+        for (const [j, c] of kids.entries()) {
+          const key = `${n.key}.c${i}_${j}`;
+          yield { id: c, key, down: true, depth: n.depth + 1, path: inPath, limit: n.limit - 1, needs: [d] };
+        }
+      }
+    }
+  }
+
+  // 0-1 breadth-first search: drawn cards cost nothing, hidden ones one step each.
+  // Cards that come for free go on a stack that is used up first.
+  const free = [{ id: root, key: 'r', line: true, down: true, depth: 0, path: new Set(), side: -1, chain: [], limit: Infinity }];
+  const queue = [];
+  let head = 0;
+  const done = new Set();
+  for (let steps = 0; (free.length || head < queue.length) && steps < maxSteps; steps++) {
+    const n = free.length ? free.pop() : queue[head++];
+    if (done.has(n.key)) continue;
+    done.add(n.key);
+    if (n.id === target) {
+      const add = new Map();
+      for (let c = n; c; c = c.from) for (const [k, isOpenNow] of c.needs ?? []) if (!isOpenNow) add.set(k, true);
+      return add;
+    }
+    for (const m of next(n)) {
+      if (done.has(m.key)) continue;
+      m.from = n;
+      (m.needs.every(([, o]) => o) ? free : queue).push(m);
+    }
+  }
+  return null;
+}

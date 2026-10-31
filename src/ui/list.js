@@ -6,9 +6,9 @@ const norm = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 /**
  * @param {HTMLTableSectionElement} tbody
  * @param {{ people: Map }} model
- * @param {{ onToggle: (id: string, on: boolean) => void, onActivate: (id: string) => void }} handlers
+ * @param {{ onToggle: (id: string, on: boolean) => void, onActivate: (id: string) => void, onReveal?: (id: string) => void }} handlers
  */
-export function createList(tbody, model, { onToggle, onActivate }) {
+export function createList(tbody, model, { onToggle, onActivate, onReveal }) {
   const rows = new Map();
   const sorted = [...model.people.values()].sort(
     (a, b) => a.surname.localeCompare(b.surname) || a.given.localeCompare(b.given) || a.birthYear - b.birthYear,
@@ -40,6 +40,12 @@ export function createList(tbody, model, { onToggle, onActivate }) {
   };
   tbody.onclick = (e) => {
     if (e.target.type !== 'checkbox') onActivate(e.target.closest('tr')?.dataset.id);
+  };
+  tbody.ondblclick = (e) => {
+    const id = e.target.closest('tr')?.dataset.id;
+    if (!id || e.target.type === 'checkbox' || !onReveal) return;
+    getSelection()?.removeAllRanges(); // the double-click selected a word of the name
+    onReveal(id);
   };
 
   return {

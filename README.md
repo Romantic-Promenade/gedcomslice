@@ -14,7 +14,10 @@ Cut a part of a family tree out of a GEDCOM file and save it as a new GEDCOM.
 2. Pick people in either view; both share one selection:
    - **List:** tick checkboxes, search by name or ID, or click a name and use
      **+ Ancestors**, **+ Descendants** (optionally with spouses) or **+ Family**
-     (parents, partners, children, siblings).
+     (parents, partners, children, siblings). Double-click a name to select
+     that person and show them in the tree: the cards on the shortest way from
+     the people already shown open up. Someone this main person's tree can't
+     reach (a partner's parents, say) becomes the main person instead.
    - **Tree:** drag with the left mouse button to draw a selection rectangle.
      Shift+drag adds to the selection, Ctrl/Cmd+drag removes from it, a click
      toggles one person. Right-drag, Space+drag or the scrollbars pan
