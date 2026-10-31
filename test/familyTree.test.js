@@ -57,6 +57,65 @@ function overlaps(layout) {
   return bad;
 }
 
+// Lines that would mislead: a couple line running behind someone else's card, or
+// the brackets of two families sharing or crossing a segment.
+function lineProblems(layout) {
+  const byId = new Map(layout.nodes.map((n) => [n.id, n]));
+  const half = CARD.h / 2;
+  const problems = [];
+  for (const e of layout.edges.filter((e) => e.couple)) {
+    const [a, b] = [byId.get(e.source), byId.get(e.target)];
+    if (a.y !== b.y) continue;
+    const [lo, hi] = [Math.min(a.x, b.x), Math.max(a.x, b.x)];
+    for (const c of cards(layout)) {
+      if (c !== a && c.y === a.y && c.x + CARD.w / 2 > lo && c.x - CARD.w / 2 < hi)
+        problems.push(`${e.source} behind ${c.id}`);
+    }
+  }
+  // Each source with its children: a horizontal bar plus vertical drops.
+  const brackets = new Map();
+  for (const e of layout.edges.filter((e) => !e.couple)) {
+    const [s, t] = [byId.get(e.source), byId.get(e.target)];
+    const top = s.kind === 'family' ? s.y : s.y + half;
+    const y = s.y + (e.turn ?? (t.y - half - top) / 2 + (top - s.y));
+    const b = brackets.get(e.source) ?? { id: e.source, y, xs: [s.x], drops: [{ x: s.x, y1: top, y2: y }] };
+    b.xs.push(t.x);
+    b.drops.push({ x: t.x, y1: y, y2: t.y - half });
+    brackets.set(e.source, b);
+  }
+  const list = [...brackets.values()];
+  for (const a of list) {
+    const [lo, hi] = [Math.min(...a.xs), Math.max(...a.xs)];
+    for (const b of list) {
+      if (a === b) continue;
+      const [blo, bhi] = [Math.min(...b.xs), Math.max(...b.xs)];
+      if (a.id < b.id && Math.abs(a.y - b.y) < 2 && lo < bhi && blo < hi)
+        problems.push(`${a.id} shares a bar with ${b.id}`);
+      for (const d of b.drops) {
+        if (d.x > lo + 1 && d.x < hi - 1 && d.y1 < a.y - 1 && d.y2 > a.y + 1) problems.push(`${b.id} crosses ${a.id}`);
+      }
+    }
+  }
+  return problems;
+}
+
+// Opens every button the layout offers, a few rounds deep.
+function openEverything(model, root, options = {}) {
+  const open = new Map();
+  let l;
+  for (let round = 0; round < 12; round++) {
+    l = layoutFamilyTree(model, root, { ...options, open });
+    const fresh = cards(l)
+      .flatMap((c) =>
+        ['u', 's', 'd'].map((d) => c[{ u: 'up', s: 'sib', d: 'down' }[d]] === 'closed' && `${d}:${c.key}`),
+      )
+      .filter((k) => k && !open.has(k));
+    if (!fresh.length) break;
+    for (const k of fresh) open.set(k, true);
+  }
+  return l;
+}
+
 describe('family tree layout', () => {
   const small = makeModel(
     [
@@ -169,6 +228,48 @@ describe('family tree layout', () => {
     }
     expect(cards(l).length).toBeGreaterThan(300);
     expect(overlaps(l)).toEqual([]);
+  });
+
+  it('keeps every family on its own lines, whatever is opened', () => {
+    // Every couple has two more children with partners and children of their own,
+    // and some ancestors have only one known parent.
+    const people = [];
+    const families = [];
+    let n = 0;
+    const add = (sex) => {
+      const id = `I${n++}`;
+      people.push([id, sex]);
+      return id;
+    };
+    const family = (h, w, kids) => families.push([`F${families.length}`, h, w, kids]);
+    // One to three families each (the third without a known partner).
+    const withKids = (p, sex, depth) => {
+      if (!depth) return;
+      for (let i = 0; i <= n % 3; i++) {
+        const partner = i < 2 ? add(sex === 'M' ? 'F' : 'M') : null;
+        const kids = [add('M'), add('F')];
+        family(sex === 'M' ? p : partner, sex === 'M' ? partner : p, kids);
+        kids.forEach((k, i) => withKids(k, i ? 'F' : 'M', depth - 1));
+      }
+    };
+    const parents = (child, depth) => {
+      if (!depth) return;
+      const single = depth === 2 && n % 3 === 0;
+      const [f, m] = [add('M'), single ? null : add('F')];
+      const sibs = [add('F'), add('M')];
+      family(f, m, [sibs[0], child, sibs[1]]);
+      sibs.forEach((s, i) => withKids(s, i ? 'M' : 'F', 2));
+      parents(f, depth - 1);
+      if (m) parents(m, depth - 1);
+    };
+    const root = add('M');
+    parents(root, 4);
+    withKids(root, 'M', 2);
+    const model = makeModel(people, families);
+    const l = openEverything(model, root);
+    expect(cards(l).length).toBeGreaterThan(300);
+    expect(overlaps(l)).toEqual([]);
+    expect(lineProblems(l)).toEqual([]);
   });
 
   it('stops at loops in broken files', () => {
